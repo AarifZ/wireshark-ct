@@ -433,6 +433,7 @@ set(DISSECTOR_PUBLIC_HEADERS
 	packet-idmp.h
 	packet-idp.h
 	packet-ieee1609dot2.h
+	packet-ieee80211-uhr.h
 	packet-ieee80211.h
 	packet-ieee80211-radio.h
 	packet-ieee80211-radiotap-iter.h
@@ -1344,6 +1345,7 @@ set(DISSECTOR_SRC
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee80211-radiotap-iter.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee80211-radiotap.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee80211-wlancap.c
+	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee80211-uhr.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee80211.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee802154.c
 	${CMAKE_CURRENT_SOURCE_DIR}/packet-ieee8021ah.c

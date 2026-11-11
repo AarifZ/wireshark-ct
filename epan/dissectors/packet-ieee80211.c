@@ -61,6 +61,7 @@
 #include <epan/reassemble.h>
 #include "packet-eapol.h"
 #include "packet-ieee80211.h"
+#include "packet-ieee80211-uhr.h"
 #include <epan/etypes.h>
 #include <epan/oui.h>
 #include <epan/crc32-tvb.h>
@@ -750,7 +751,27 @@ static value_string_ext tag_num_vals_ext = VALUE_STRING_EXT_INIT(ie_tag_num_vals
 #define ETAG_NONAP_STA_REGULATORY_CONNECT               137
 
 
+#define ETAG_UHR_OPERATION 151
+#define ETAG_UHR_CAPABILITIES 152
+#define ETAG_MACP 153
+#define ETAG_SMD 154
+#define ETAG_BSS_SMD_TRANS_PARAMS 155
+#define ETAG_CHANNEL_USAGE 156
+#define ETAG_UHR_MODE_CHANGE 157
+#define ETAG_UHR_PARAMETER_UPDATE 158
+#define ETAG_TXPI 159
+
 static const value_string tag_num_vals_eid_ext[] = {
+  { ETAG_UHR_OPERATION, "UHR Operation" },
+  { ETAG_UHR_CAPABILITIES, "UHR Capabilities" },
+  { ETAG_MACP, "MACP" },
+  { ETAG_SMD, "SMD" },
+  { ETAG_BSS_SMD_TRANS_PARAMS, "BSS SMD Transition Parameters" },
+  { ETAG_CHANNEL_USAGE, "Channel Usage" },
+  { ETAG_UHR_MODE_CHANGE, "UHR Mode Change" },
+  { ETAG_UHR_PARAMETER_UPDATE, "UHR Parameter Update" },
+  { ETAG_TXPI, "TXPI" },
+
   { ETAG_ASSOC_DELAY_INFO,                    "Association Delay Info" },
   { ETAG_FILS_REQ_PARAMS,                     "FILS Request Parameters" },
   { ETAG_FILS_KEY_CONFIRM,                    "FILS Key Confirmation" },
@@ -914,6 +935,8 @@ static const value_string ieee80211_supported_rates_vals[] = {
   { 0xE0, "48(B)" },
   { 0xEC, "54(B)" },
   /* BSS membership selector */
+  { 0xF8, "UHR PHY" },
+  { 0xF9, "EHT PHY" },
   { 0xFA, "HE PHY" },
   { 0xFB, "SAE Hash to Element Only" },
   { 0xFC, "EPD" }, /* 802.11ak */
@@ -1319,6 +1342,7 @@ static value_string_ext aruba_mgt_typevals_ext = VALUE_STRING_EXT_INIT(aruba_mgt
 #define CAT_PROTECTED_FTM         34
 #define CAT_EHT                   36
 #define CAT_PROTECTED_EHT         37
+#define CAT_PROTECTED_UHR         43
 #define CAT_VENDOR_SPECIFIC_PROTECTED 126
 #define CAT_VENDOR_SPECIFIC     127
 
@@ -2431,6 +2455,7 @@ static const value_string category_codes[] = {
   {CAT_PROTECTED_FTM,                    "Protected FTM"},
   {CAT_EHT,                              "EHT"},
   {CAT_PROTECTED_EHT,                    "Protected EHT"},
+  {CAT_PROTECTED_UHR,                    "Protected UHR"},
   {CAT_VENDOR_SPECIFIC_PROTECTED,        "Vendor-specific Protected"},
   {CAT_VENDOR_SPECIFIC,                  "Vendor Specific"},
 
@@ -2461,6 +2486,7 @@ static const value_string category_codes[] = {
   {0x80 | CAT_PROTECTED_FTM,             "Protected FTM (error)"},
   {0x80 | CAT_EHT,                       "EHT (error)"},
   {0x80 | CAT_PROTECTED_EHT,             "Protected EHT (error)"},
+  {0x80 | CAT_PROTECTED_UHR,             "Protected UHR (error)"},
   {0x80 | CAT_VENDOR_SPECIFIC_PROTECTED, "Vendor-specific Protected (error)"},
   {0x80 | CAT_VENDOR_SPECIFIC,           "Vendor Specific (error)"},
   {0, NULL}
@@ -19023,6 +19049,9 @@ add_ff_action(proto_tree *tree, tvbuff_t *tvb, packet_info *pinfo, int offset,
     return add_ff_action_protected_he(tree, tvb, pinfo, offset);
   case CAT_PROTECTED_EHT:
     return add_ff_action_protected_eht(tree, tvb, pinfo, offset);
+  case CAT_PROTECTED_UHR:
+    add_ff_category_code(tree, tvb, pinfo, offset);
+    return dissect_uhr_action(tvb, pinfo, tree, offset);
   case CAT_PROTECTED_FTM:
     return add_ff_action_protected_ftm(tree, tvb, pinfo, offset);
   case CAT_EHT:
@@ -35942,6 +35971,20 @@ ieee80211_tag_element_id_extension(tvbuff_t *tvb, packet_info *pinfo, proto_tree
       break;
     case ETAG_EHT_OPERATION:
       dissect_eht_operation(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
+    case ETAG_UHR_OPERATION:
+      dissect_uhr_operation(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
+    case ETAG_UHR_CAPABILITIES:
+      dissect_uhr_capabilities(tvb, pinfo, tree, offset, ext_tag_len,
+          field_data->ftype == MGT_BEACON || field_data->ftype == MGT_PROBE_RESP ||
+          field_data->ftype == MGT_ASSOC_RESP || field_data->ftype == MGT_REASSOC_RESP);
+      break;
+    case ETAG_SMD:
+      dissect_uhr_smd(tvb, pinfo, tree, offset, ext_tag_len);
+      break;
+    case ETAG_UHR_MODE_CHANGE:
+      dissect_uhr_mode_change(tvb, pinfo, tree, offset, ext_tag_len);
       break;
     case ETAG_EHT_CAPABILITIES:
       dissect_eht_capabilities(tvb, pinfo, tree, offset, ext_tag_len);
@@ -62120,6 +62163,7 @@ proto_register_ieee80211(void)
 
   /* Register configuration options */
   wlan_module = prefs_register_protocol(proto_wlan, init_wepkeys);
+  register_uhr_fields(proto_wlan, wlan_module, expert_ieee80211);
   prefs_register_bool_preference(wlan_module, "defragment",
     "Reassemble fragmented 802.11 datagrams",
     "Whether fragmented 802.11 datagrams should be reassembled",

@@ -762,15 +762,6 @@ static value_string_ext tag_num_vals_ext = VALUE_STRING_EXT_INIT(ie_tag_num_vals
 #define ETAG_TXPI 159
 
 static const value_string tag_num_vals_eid_ext[] = {
-  { ETAG_UHR_OPERATION, "UHR Operation" },
-  { ETAG_UHR_CAPABILITIES, "UHR Capabilities" },
-  { ETAG_MACP, "MACP" },
-  { ETAG_SMD, "SMD" },
-  { ETAG_BSS_SMD_TRANS_PARAMS, "BSS SMD Transition Parameters" },
-  { ETAG_CHANNEL_USAGE, "Channel Usage" },
-  { ETAG_UHR_MODE_CHANGE, "UHR Mode Change" },
-  { ETAG_UHR_PARAMETER_UPDATE, "UHR Parameter Update" },
-  { ETAG_TXPI, "TXPI" },
 
   { ETAG_ASSOC_DELAY_INFO,                    "Association Delay Info" },
   { ETAG_FILS_REQ_PARAMS,                     "FILS Request Parameters" },
@@ -835,6 +826,15 @@ static const value_string tag_num_vals_eid_ext[] = {
   { ETAG_AID_BITMAP,                          "AID Bitmap (802.11be D3.0)" },
   { ETAG_BANDWIDTH_INDICATION,                "Bandwidth Indication (802.11be D3.0)" },
   { ETAG_NONAP_STA_REGULATORY_CONNECT,        "Non-AP STA Regulatory Connectivity" },
+  { ETAG_UHR_OPERATION, "UHR Operation" },
+  { ETAG_UHR_CAPABILITIES, "UHR Capabilities" },
+  { ETAG_MACP, "MACP" },
+  { ETAG_SMD, "SMD" },
+  { ETAG_BSS_SMD_TRANS_PARAMS, "BSS SMD Transition Parameters" },
+  { ETAG_CHANNEL_USAGE, "Channel Usage" },
+  { ETAG_UHR_MODE_CHANGE, "UHR Mode Change" },
+  { ETAG_UHR_PARAMETER_UPDATE, "UHR Parameter Update" },
+  { ETAG_TXPI, "TXPI" },
   { 0, NULL }
 };
 static value_string_ext tag_num_vals_eid_ext_ext = VALUE_STRING_EXT_INIT(tag_num_vals_eid_ext);

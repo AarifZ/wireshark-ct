@@ -1,3 +1,16 @@
+CT native UHR decoding
+----------------------
+
+This branch adds native Wi-Fi 8 UHR Operation and Capabilities decoding,
+including NPCA, SMD, Mode Change controls and UHR action headers. See
+[doc/README.uhr](doc/README.uhr) for draft selection, limits and pinned sources.
+Build the GUI and TShark on Fedora and run the regression tests with:
+
+    bash tools/build-uhr-fedora.sh --install-deps
+
+The helper explicitly maps GCC/G++, stages runtime protocol data, and
+supports CC/CXX overrides.
+
 General Information
 -------------------
 

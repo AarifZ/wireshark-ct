@@ -1,0 +1,166 @@
+Native IEEE 802.11bn UHR decoding
+================================
+
+This branch adds native Wi-Fi 8 decoding to Ben Greear's wireshark-ct
+5.1.0 development tree, based on 4e87fb90d01962caf1a155493920ace73d3be716.
+Wireshark and TShark share these fields; the Lua postdissector is not needed.
+
+Implemented
+-----------
+
+* UHR Operation, extension 151: control flags and optional DPS, NPCA,
+  P-EDCA and DBE parameters, including disabled subchannel bitmaps.
+* UHR Capabilities, extension 152: fixed six-octet MAC and five-octet PHY
+  capabilities, public bit definitions, and AP-only DBE capability tails.
+* SMD Information, extension 154: ID, capabilities and timeout.
+* UHR Mode Change, extension 157: tuple controls, mode IDs and raw mode data.
+* Protected UHR category 43: Request/Response/Notify action codes, dialog
+  token, type and Response Count. Variable action bodies remain raw.
+* UHR/EHT Supported Rates membership selectors (0xf8/0xf9).
+* Names for extensions 153, 155, 156, 158 and 159; their payloads remain
+  undecoded. Existing native UHR Trigger decoding is retained unchanged.
+
+This is partial native support, not a complete 802.11bn implementation or
+conformance checker. DUO internal bits, DBE EHT MCS/NSS map contents,
+mode specific data, action variable bodies and unsupported extra bytes
+remain raw. No UHR PPDU/radiotap metadata or vendor formats are invented.
+Protected action bodies must already be decrypted using Wireshark's usual
+mechanism. Hardware/drivers must still deliver the frames and metadata.
+
+Choosing the reference layout
+-----------------------------
+
+Preferences > Protocols > IEEE 802.11 > UHR reference layout:
+
+    d1_5       default, pinned public D1.5 reference
+    pre_d1_5   older pinned Linux reference 410d70acf9ca
+
+Or on the command line:
+
+    build-uhr/run/tshark -o wlan.uhr_layout:d1_5 -r capture.pcapng
+    build-uhr/run/tshark -o wlan.uhr_layout:pre_d1_5 -r capture.pcapng
+
+The generated wlan.uhr.layout field identifies the chosen interpretation.
+The packet does not identify its draft. The decoder does not guess a draft
+from length, and pre_d1_5 does not cover every earlier/vendor revision.
+Confirm the Qualcomm firmware's reference before drawing conclusions.
+
+D1.5 removed the four-byte Basic UHR MCS/NSS Set from Operation. Therefore,
+an Operation containing only two control bytes can be complete under that
+reference. The previous Lua decoder's missing-four-bytes warning is not
+proof of a firmware defect. D1.5 also moved presence bits, changed NPCA
+Primary Channel from an offset to a channel number, changed P-EDCA packing,
+and changed parts of MAC and DBE Capability packing.
+
+Presence bits locate optional fields independently of feature enable bits.
+D1.5 Linux walkers skip one raw DUO octet. For pre-D1.5 DUO or unassigned
+Operation control bits, later offsets are deliberately not assumed.
+AP DBE tails are decoded in Beacon, Probe Response, Association Response
+and Reassociation Response elements. Non-AP DBE support does not imply an
+AP-only tail. Disable the old wifi8_uhr.lua postdissector to avoid two views
+with different draft assumptions and filter names.
+
+Useful display filters
+----------------------
+
+    wlan.ext_tag.number == 151
+    wlan.ext_tag.number == 152
+    wlan.uhr.operation.npca_ena == 1
+    wlan.uhr.operation.npca_pres == 1
+    wlan.uhr.npca.primary_chan == 44
+    wlan.uhr.npca.primary_channel_offset
+    wlan.uhr.capabilities.mac.npca_supp == 1
+    wlan.uhr.mode_change.mode_id == 1
+    wlan.uhr.action
+    wlan.uhr.truncated
+    wlan.uhr.undecoded_data
+
+Numeric fields described as codes retain the encoded value; do not assume
+that every timing or bandwidth code is a literal number of us or MHz.
+
+Build on Fedora / LANforge
+-------------------------
+
+    bash tools/build-uhr-fedora.sh --install-deps
+    ./build-uhr/run/wireshark
+
+Without installing dependencies:
+
+    bash tools/build-uhr-fedora.sh
+
+The helper uses the tree's RPM setup script for dependencies, explicitly
+maps CMake to /usr/bin/gcc and /usr/bin/g++, builds the Qt GUI and TShark,
+and runs the UHR regression suite. It uses /usr/bin/python3 by default to
+avoid unintentionally selecting Python from an active virtualenv.
+It prints compiler paths and versions. No global compiler symlinks change,
+and the system Wireshark installation is not replaced.
+
+Custom toolchain or Python:
+
+    CC=/path/to/gcc CXX=/path/to/g++ UHR_PYTHON=/path/to/python3 \
+        UHR_BUILD_DIR="$PWD/build-custom" UHR_BUILD_JOBS=2 \
+        bash tools/build-uhr-fedora.sh
+
+CC/CXX must name executable files, without flags or wrapper arguments.
+Python must have pytest. A cache with different compilers is rejected;
+choose a fresh build directory when changing toolchains. An equivalent
+cached compiler spelling is reused so CMake does not reset other settings.
+This updated base requires CMake 3.22 or later and compilers supporting
+C17 and C++17; CMake selects the required language standards.
+UHR_BUILD_TYPE can select Release instead of default RelWithDebInfo.
+
+Fedora 39 may require archived dependency repositories. A successful build
+on Debian does not establish Fedora 39 runtime compatibility. An AppImage
+is a separate packaging task; this branch provides source and a build helper.
+
+Validation
+----------
+
+This revision is retargeted to Ben's master at
+4e87fb90d01962caf1a155493920ace73d3be716 (Wireshark 5.1.0 development).
+On Debian 13 x86_64, GCC/G++ 14.2.0, CMake 3.31.6 and Qt 6.8.2:
+
+* 49 UHR tests pass, including 512 deterministic mutated frames across
+  the two selected layouts.
+* 30 existing 802.11 decryption tests pass, including WPA3 and MLO cases.
+* API, header-field, typed-item and true/false checks pass for the helper.
+  The full code hook reports the same existing snprintf warning in
+  packet-ieee80211.c as the unmodified base.
+
+The build uses Release mode with compiler warnings treated as errors,
+Lua off and live-capture helpers off. These results do not validate Fedora
+39 installation, capture permissions or every optional dependency. The
+firmware's draft still needs confirmation. No private captures are added.
+
+    python3 -m pytest test/suite_uhr.py --program-path=/path/to/build/run \
+        --disable-capture --disable-gui -o addopts= -q
+
+The tests generate synthetic frames in temporary files. Coverage includes
+both reference layouts, enable/presence distinction, optional alignment,
+AP/non-AP tails, six management subtypes, SMD, Mode Change tuples, action
+headers, truncation, repeated elements, IE boundaries and deterministic
+mutations. No private captures, vendor identifiers or credentials are
+included. Customer captures should stay outside the repository.
+
+Public sources
+--------------
+
+D1.5 structures, masks, and NPCA/DBE walkers (pinned):
+https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/linux/ieee80211-uhr.h
+SHA256 of that header:
+78f281c3b4e46c37e7399013d9e6d1b15999eb533b6a4dcf9018e2950e90d2e5
+
+Pre-D1.5 layout:
+https://github.com/torvalds/linux/blob/410d70acf9ca73fdf370e1eb7e1da64e486dcbb5/include/linux/ieee80211-uhr.h
+
+Extension IDs, membership selectors and action headers at the current pin:
+https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/linux/ieee80211.h
+
+Public hostapd D1.5 change discussion:
+https://lists.infradead.org/pipermail/hostap/2026-July/045392.html
+
+Existing upstream UHR Trigger support:
+https://gitlab.com/wireshark/wireshark/-/merge_requests/20410
+
+No NDA Windows dissector, private source or unpublished IEEE draft text was
+used. The public references are draft snapshots, not a final specification.

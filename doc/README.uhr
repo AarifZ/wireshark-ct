@@ -1,0 +1,53 @@
+IEEE 802.11bn UHR
+=================
+
+The dissector handles UHR Operation (extension 151), UHR Capabilities
+(extension 152), SMD information (extension 154), UHR Mode Change controls
+(extension 157), and Protected UHR action headers.
+
+Reference layout
+----------------
+
+The wlan.uhr_layout preference selects one of two layouts:
+
+    d1_5       IEEE 802.11bn D1.5 (default)
+    pre_d1_5   Earlier layout from Linux revision 410d70acf9ca
+
+The selected layout is shown in wlan.uhr.layout. The draft version is not
+carried in these elements.
+
+D1.5 removed the Basic UHR MCS/NSS Set from Operation and changed the
+presence bits and the NPCA, P-EDCA and DBE layouts. An Operation element
+containing only two control octets can therefore be valid in D1.5.
+
+Optional fields are located using presence bits, independently of feature
+enable bits. AP DBE capability parameters are parsed in Beacon, Probe
+Response, Association Response and Reassociation Response frames.
+
+DUO internal fields, DBE MCS/NSS map contents, mode-specific data and
+action variable bodies remain raw. Parsing stops where an unsupported
+field prevents determining the next offset.
+
+Examples
+--------
+
+    tshark -o wlan.uhr_layout:d1_5 -r capture.pcapng
+    tshark -o wlan.uhr_layout:pre_d1_5 -r capture.pcapng
+
+Useful filters:
+
+    wlan.uhr.operation.npca_ena
+    wlan.uhr.capabilities.mac.npca_supp
+    wlan.uhr.truncated
+
+References
+----------
+
+D1.5 definitions and field masks:
+https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/linux/ieee80211-uhr.h
+
+Earlier definitions:
+https://github.com/torvalds/linux/blob/410d70acf9ca73fdf370e1eb7e1da64e486dcbb5/include/linux/ieee80211-uhr.h
+
+Extension identifiers and action headers:
+https://github.com/torvalds/linux/blob/067c5c24cef23d913b67eaaf71ae67e7169a6620/include/linux/ieee80211.h
